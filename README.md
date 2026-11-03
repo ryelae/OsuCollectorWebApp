@@ -1,18 +1,43 @@
-# osu! Collection Hub Web App
+# osu! Collection Hub: Web App
 
-Private web app for uploading and sharing **osu! stable** `collection.db` files with friends.
-Pair it with the [desktop app](https://github.com/ryelae/OsuCollectorDesktopApp) for full functionality (browsing, comparing, downloading missing maps).
+Share osu! beatmap collections with friends without passing files around.
+
+My friends and I kept sending each other `collection.db` files and then hunting down every missing map by hand. This web app is the shared hub: everyone uploads their collections, and anyone in the group can browse, compare, or merge them. Pair it with the [desktop app](https://github.com/ryelae/OsuCollectorDesktopApp), which downloads the missing maps and imports collections straight into osu!.
+
+<!-- Screenshot: add a screenshot of the uploads or compare page here, e.g. ![Comparing two uploads](docs/compare.png) -->
 
 ---
 
 ## What it does
 
-| Feature    | Details                                                                           |
-| ---------- | --------------------------------------------------------------------------------- |
-| **Upload** | Drag-and-drop `collection.db`, select which collections to include, name yourself |
-| **Browse** | View all uploads, see every collection and its map count                          |
-| **Share**  | Each upload has a permanent shareable link                                        |
-| **Auth**   | Optional shared password (env var) — off by default for local use                 |
+| Feature     | Details                                                                            |
+| ----------- | ---------------------------------------------------------------------------------- |
+| **Upload**  | Drag and drop `collection.db`, pick which collections to include, name yourself    |
+| **Browse**  | View all uploads, every collection, and its map count                              |
+| **Compare** | Put two people's uploads side by side and see shared and unique maps per collection |
+| **Merge**   | Combine collections from different people and export a new `collection.db`         |
+| **Share**   | Each upload has a permanent shareable link                                         |
+| **Auth**    | Optional shared password (env var), off by default for local use                   |
+
+---
+
+## How it works
+
+```mermaid
+flowchart LR
+    A[collection.db] -->|upload| B[Next.js app]
+    B -->|parse binary format| C[(SQLite)]
+    C --> D[Browse / Compare / Merge]
+    D -->|export| E[New collection.db]
+    C -->|hash API| F[Desktop app]
+```
+
+A few of the interesting parts:
+
+- **Binary format parser and writer.** osu! stores collections in a custom binary format (ULEB128 length prefixed strings, little endian ints). The app parses uploads on the server and can write a brand new `collection.db` for merged exports. A round trip test suite covers edge cases like empty names, UTF-8 names, and malformed files.
+- **Browser side preview.** A lightweight parser runs in the browser so you can see collection names and counts and pick what to upload before anything is sent.
+- **API for the desktop app.** The desktop app pulls beatmap hashes per collection from a small REST endpoint.
+- **Deployment.** Hosted on Fly.io with a persistent volume for SQLite, plus a GitHub Actions deploy workflow.
 
 ---
 
@@ -46,7 +71,7 @@ osu!lazer uses a different format and is not supported. I may start working on a
 
 ```bash
 git clone <your-repo-url>
-cd osuCollectorInHouse
+cd OsuCollectorWebApp
 npm install
 ```
 
@@ -54,7 +79,7 @@ npm install
 
 ```bash
 cp .env.example .env.local
-# Edit .env.local — set APP_PASSWORD or leave blank for open access
+# Edit .env.local: set APP_PASSWORD or leave blank for open access
 ```
 
 ### 3. Run
@@ -104,7 +129,7 @@ Make sure osu! is **closed** before copying the file to avoid partial reads.
 
 ## Deployment
 
-### Option A — Fly.io (recommended)
+### Option A: Fly.io (recommended)
 
 ```bash
 fly launch
@@ -114,7 +139,7 @@ fly deploy
 
 Mount a persistent volume at `/app/data` for the SQLite DB and uploaded files.
 
-### Option B — Node.js server
+### Option B: Node.js server
 
 ```bash
 npm run build
@@ -122,7 +147,7 @@ APP_PASSWORD=secret npm start
 # Runs on port 3000
 ```
 
-### Option C — Docker
+### Option C: Docker
 
 ```bash
 docker build -t osu-collection-hub .
@@ -170,7 +195,7 @@ src/
     utils.ts               # Shared utilities
   middleware.ts            # Auth guard (edge runtime)
   app/
-    (app)/                 # Route group — all guarded pages
+    (app)/                 # Route group, all guarded pages
       layout.tsx           # App shell with nav
       page.tsx             # Home / dashboard
       uploads/             # Upload list + upload form
@@ -200,8 +225,7 @@ data/                      # Runtime data (gitignored)
 - **Single shared password.** There is no per-user account system.
 - **Local file storage.** Uploaded files live on disk next to the app. Back up `./data/` regularly.
 
-## Future Features
-- **Video / no video download preferences.** Currently defaults to downloading with video... haven't solved yet
-- **Difficulty names for each song** Currently shows each difficulty as just the name - indistinguishable
-- **TBD**
+## Roadmap
 
+- **Video / no video downloads.** Downloads currently default to including video. Still working on this one.
+- **Difficulty names.** Each difficulty currently shows only the song name, so difficulties are hard to tell apart.
